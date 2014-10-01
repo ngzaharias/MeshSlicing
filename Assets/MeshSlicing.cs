@@ -19,7 +19,8 @@ public class MeshSlicing : MonoBehaviour {
 
 	Mesh _mesh;
 
-	public Plane plane = new Plane(new Vector3(1,1,0), -.25f);
+	Plane plane;
+	Vector3 startPoint;
 
 	List<Vector3> vertices;
 	List<Vector3> normals;
@@ -28,9 +29,38 @@ public class MeshSlicing : MonoBehaviour {
 	public Vector3 v1 = Vector3.up;
 	public Vector3 v2 = Vector3.right;
 
+	void OnGUI()
+	{
+		GUI.Label (new Rect (0, 0, 500, 500), Input.mousePosition.ToString());
+	}
+
+	void OnTriggerEnter(Collider coll)
+	{
+		startPoint = coll.transform.position - transform.position;
+	}
+
+	void OnTriggerExit(Collider coll)
+	{
+		Vector3 endPoint = coll.transform.position - transform.position;
+		Vector3 n = Vector3.Cross(startPoint-endPoint, transform.forward);
+		n.Normalize ();
+
+		plane = new Plane (n, endPoint);
+
+		Mesh A, B;
+		SliceMesh(out A, out B);
+		
+		//	Set Main mesh to A
+		GetComponent<MeshFilter>().mesh = A;
+		
+		//	Create a new GameObject with B
+		InstantiateGameobjectWithMesh(B);
+	}
+
 	void Update() 
 	{
 		if (Input.GetKeyDown(KeyCode.F1)) {
+
 			Mesh A, B;
 			SliceMesh(out A, out B);
 
@@ -44,6 +74,13 @@ public class MeshSlicing : MonoBehaviour {
 
 	void InstantiateGameobjectWithMesh(Mesh mesh)
 	{
+		int size = 0;
+		for (int i = 0; i < mesh.subMeshCount; i++)
+			size+= mesh.GetTriangles(i).Length;
+
+		if (size < 1)
+			return;
+
 		GameObject obj = Instantiate(this.gameObject) as GameObject;
 		obj.GetComponent<MeshFilter>().mesh = mesh;
 	}
