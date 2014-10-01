@@ -19,7 +19,7 @@ public class MeshSlicing : MonoBehaviour {
 
 	Mesh _mesh;
 
-	public Plane plane = new Plane(new Vector3(0,1,0), 0f);
+	public Plane plane = new Plane(new Vector3(1,1,0), -.25f);
 
 	List<Vector3> vertices;
 	List<Vector3> normals;
@@ -39,12 +39,6 @@ public class MeshSlicing : MonoBehaviour {
 
 			//	Create a new GameObject with B
 			InstantiateGameobjectWithMesh(B);
-		}
-
-		if (Input.GetKeyDown(KeyCode.F2)) {
-			Vector3 v3 = new Vector3(0,0,-1);
-			Debug.Log(v3);
-			Debug.Log(Angle360(v1.normalized, v2.normalized, v3.normalized));
 		}
 	}
 
@@ -140,8 +134,8 @@ public class MeshSlicing : MonoBehaviour {
 
 		//	Reorder the polygons winding order of points
 		//	so that they are front facing (CW for Unity)
-		ReorderPolygonIndicesCW(ref polyA);
-		ReorderPolygonIndicesCW(ref polyB);
+		polyA = ReorderdPolygonIndicesCW(polyA);
+		polyB = ReorderdPolygonIndicesCW(polyB);
 
 		//	Split polygon into triangles if more than 3 points
 		SplitPolygonInTriangles(ref polyA);
@@ -249,16 +243,57 @@ public class MeshSlicing : MonoBehaviour {
 			polygon.Clear();
 	}
 
-	void ReorderPolygonIndicesCW(ref List<int> polygon)
+	List<int> ReorderdPolygonIndicesCW(List<int> polygon)
 	{
+		if (polygon.Count < 3)
+			return polygon;
 
+		//	Add the first point
+		List<int> newPolygon = new List<int>();
+		newPolygon.Add(polygon[0]);
+		polygon.RemoveAt(0);
+
+		//	Generate the centre point of the face
+		Vector3 centre = CentrePointOfFace(polygon);
+
+		//	Generate the comparitive direction
+		int startIndex = newPolygon[0];
+		Vector3 v1 = vertices[startIndex] - centre;
+
+		while (polygon.Count > 0) {
+			int index = 0;
+			float angle = 360;
+			for (int i = 0; i < polygon.Count; i++) {
+				Vector3 v2 = vertices[polygon[i]] - centre;
+				float theta = Angle360(v1, v2, normals[startIndex]);
+				if (theta <= angle) {
+					index = i;
+					angle = theta;
+				}
+			}
+			newPolygon.Add(polygon[index]);
+			polygon.RemoveAt(index);
+		}
+
+		return newPolygon;
+	}
+
+	Vector3 CentrePointOfFace(List<int> polygon)
+	{
+		//	Generate the centre point of the face
+		Vector3 centre = Vector3.zero;
+		foreach (int index in polygon)
+			centre += vertices[index];
+		return centre / polygon.Count;
 	}
 
 	void SplitPolygonInTriangles(ref List<int> polygon)
 	{
+		if (polygon.Count < 3)
+			return;
+
 		List<int> triangles = new List<int>();
-		for (int i = 1; i < polygon.Count-1; i++)
-		{
+		for (int i = 1; i < polygon.Count-1; i++) {
 			triangles.Add(polygon[0]);
 			triangles.Add(polygon[i]);
 			triangles.Add(polygon[i+1]);
@@ -277,8 +312,16 @@ public class MeshSlicing : MonoBehaviour {
 		float signed_angle = angle * sign;
 		
 		//	360 angle
-		return (signed_angle <= 0) ? 360+signed_angle : signed_angle;
+		return (signed_angle <= 0) ? 360 + signed_angle : signed_angle;
+	}
 
-		return signed_angle;
+	float AngleSigned(Vector3 v1, Vector3 v2, Vector3 n)
+	{
+		//	Acute angle [0,180]
+		float angle = Vector3.Angle(v1,v2);
+		
+		//	-Acute angle [180,-179]
+		float sign = Mathf.Sign(Vector3.Dot(n, Vector3.Cross(v1, v2)));
+		return angle * sign;
 	}
 }
